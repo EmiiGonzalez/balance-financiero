@@ -6,8 +6,9 @@ import os
 from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from typing import Dict, List, Union
+from typing import Dict, List
 import json
+import uuid
 
 class FinancialManager:
     def __init__(self):
@@ -102,7 +103,7 @@ class FinancialManager:
         if not os.path.exists(self.csv_file):
             with open(self.csv_file, mode="w", newline="", encoding="utf-8") as file:
                 writer = csv.writer(file)
-                writer.writerow(["Tipo", "Descripción", "Monto", "Categoría", "Fecha", "Notas"])
+                writer.writerow(["Tipo", "Descripción", "Monto", "Categoría", "Fecha", "Notas", "id"])
 
     def create_widgets(self):
         # Main container
@@ -203,6 +204,12 @@ class FinancialManager:
         # Variables
         self.month_var = tk.StringVar(value=datetime.now().strftime("%m"))
         self.year_var = tk.StringVar(value=datetime.now().strftime("%Y"))
+        
+        filter_var = []
+        self.tipo_filter_var = tk.StringVar(value=filter_var)
+        filter_var.append("Todos")
+        for category in self.categories.keys():
+            filter_var.append(category)
 
         # Month and Year filters
         ttk.Label(filter_frame, text="Mes:").pack(side=tk.LEFT, padx=5)
@@ -214,6 +221,12 @@ class FinancialManager:
         ttk.Combobox(filter_frame, textvariable=self.year_var,
                     values=[str(i) for i in range(datetime.now().year, 2000, -1)],
                     state="readonly", width=6).pack(side=tk.LEFT, padx=5)
+
+        # Type filter
+        ttk.Label(filter_frame, text="Tipo:").pack(side=tk.LEFT, padx=5)
+        ttk.Combobox(filter_frame, textvariable=self.tipo_filter_var, 
+                    values=filter_var, 
+                    state="readonly").pack(side=tk.LEFT, padx=5)
 
         # Filter buttons
         ttk.Button(filter_frame, text="Filtrar", 
@@ -228,15 +241,30 @@ class FinancialManager:
         table_frame = ttk.LabelFrame(self.main_container, text="Registros", padding=10)
         table_frame.pack(fill=tk.BOTH, expand=True)
 
+        # Create buttons frame
+        buttons_frame = ttk.Frame(table_frame)
+        buttons_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Button(buttons_frame, text="Editar", 
+                  command=self.edit_entry,
+                  style="Custom.TButton").pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(buttons_frame, text="Eliminar", 
+                  command=self.delete_entry,
+                  style="Custom.TButton").pack(side=tk.LEFT, padx=5)
+
         # Create Treeview
-        columns = ("Tipo", "Descripción", "Monto", "Categoría", "Fecha", "Notas")
+        columns = ("Tipo", "Descripción", "Monto", "Categoría", "Fecha", "Notas", "id")
         self.table = ttk.Treeview(table_frame, columns=columns, show="headings", style="Custom.Treeview")
 
         # Configure columns
         for col in columns:
             self.table.heading(col, text=col)
             self.table.column(col, width=100)
-
+            
+        # Hide the ID column
+        self.table.column("id", width=0, stretch=False)
+        
         # Add scrollbar
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.table.yview)
         self.table.configure(yscroll=scrollbar.set)
@@ -244,6 +272,143 @@ class FinancialManager:
         # Pack widgets
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.table.pack(fill=tk.BOTH, expand=True)
+        
+    def add_entry(self):
+        # Validación de datos
+        if not self.validate_entry():
+            return
+
+        # Agregar entrada al CSV
+        entry_id = str(uuid.uuid4().hex)  # Remove the comma by converting to string first
+        with open(self.csv_file, mode="a", newline="", encoding="utf-8") as file:
+            writer = csv.writer(file)
+            writer.writerow([
+                self.tipo_var.get(),
+                self.descripcion_var.get(),
+                self.monto_var.get(),
+                self.categoria_var.get(),
+                self.fecha_var.get(),
+                self.notas_var.get(),
+                entry_id
+            ])
+
+        self.load_data()
+        self.clear_entries()
+        self.update_historical_totals()
+        messagebox.showinfo("Éxito", "Entrada agregada correctamente")
+    
+    def edit_entry(self):
+        selected_item = self.table.selection()
+        if not selected_item:
+            messagebox.showwarning("Advertencia", "Por favor selecciona un registro para editar")
+            return
+
+        # Get the values of the selected item
+        values = self.table.item(selected_item[0])['values']
+        entry_id = values[6]  # Get the ID from the hidden column
+
+        # Create edit window
+        edit_window = tk.Toplevel(self.root)
+        edit_window.title("Editar Registro")
+        edit_window.geometry("400x300")
+
+        # Create variables for the entry fields
+        tipo_var = tk.StringVar(value=values[0])
+        descripcion_var = tk.StringVar(value=values[1])
+        monto_var = tk.StringVar(value=values[2])
+        categoria_var = tk.StringVar(value=values[3])
+        fecha_var = tk.StringVar(value=values[4])
+        notas_var = tk.StringVar(value=values[5])
+
+        # Create entry fields
+        ttk.Label(edit_window, text="Tipo:").pack(pady=5)
+        tipo_combo = ttk.Combobox(edit_window, textvariable=tipo_var, values=list(self.categories.keys()), state="readonly")
+        tipo_combo.pack(pady=5)
+
+        ttk.Label(edit_window, text="Descripción:").pack(pady=5)
+        ttk.Entry(edit_window, textvariable=descripcion_var).pack(pady=5)
+
+        ttk.Label(edit_window, text="Monto:").pack(pady=5)
+        ttk.Entry(edit_window, textvariable=monto_var).pack(pady=5)
+
+        ttk.Label(edit_window, text="Categoría:").pack(pady=5)
+        categoria_combo = ttk.Combobox(edit_window, textvariable=categoria_var, state="readonly")
+        categoria_combo.pack(pady=5)
+
+        ttk.Label(edit_window, text="Fecha:").pack(pady=5)
+        ttk.Entry(edit_window, textvariable=fecha_var).pack(pady=5)
+
+        ttk.Label(edit_window, text="Notas:").pack(pady=5)
+        ttk.Entry(edit_window, textvariable=notas_var).pack(pady=5)
+
+        # Update category options when type changes
+        def update_categories(event=None):
+            selected_tipo = tipo_var.get()
+            if selected_tipo in self.categories:
+                categoria_combo['values'] = self.categories[selected_tipo]
+
+        tipo_combo.bind('<<ComboboxSelected>>', update_categories)
+        update_categories()  # Call once to set initial categories
+
+        def save_changes():
+            # Read all entries
+            entries = []
+            with open(self.csv_file, mode="r", newline="", encoding="utf-8") as file:
+                reader = csv.reader(file)
+                entries = list(reader)
+
+            # Update the matching entry
+            for i, row in enumerate(entries):
+                if len(row) > 6 and row[6] == entry_id:
+                    entries[i] = [
+                        tipo_var.get(),
+                        descripcion_var.get(),
+                        monto_var.get(),
+                        categoria_var.get(),
+                        fecha_var.get(),
+                        notas_var.get(),
+                        entry_id
+                    ]
+                    break
+
+            # Write all entries back to the file
+            with open(self.csv_file, mode="w", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+                writer.writerows(entries)
+
+            self.load_data()
+            self.update_historical_totals()
+            edit_window.destroy()
+            messagebox.showinfo("Éxito", "Registro actualizado correctamente")
+
+        ttk.Button(edit_window, text="Guardar", command=save_changes).pack(pady=20)
+        
+    def delete_entry(self):
+        selected_item = self.table.selection()
+        if not selected_item:
+            messagebox.showwarning("Advertencia", "Por favor selecciona un registro para eliminar")
+            return
+
+        if not messagebox.askyesno("Confirmar", "¿Estás seguro de eliminar este registro?"):
+            return
+
+        # Get the ID of the selected item
+        entry_id = self.table.item(selected_item[0])['values'][6]
+
+        # Read all entries except the one to delete
+        entries = []
+        with open(self.csv_file, mode="r", newline="", encoding="utf-8") as file:
+            reader = csv.reader(file)
+            entries = [row for row in reader if len(row) <= 6 or row[6] != entry_id]
+
+        # Write the remaining entries back to the file
+        with open(self.csv_file, mode="w", newline="", encoding="utf-8") as file:
+            writer = csv.writer(file)
+            writer.writerows(entries)
+
+        self.load_data()
+        self.update_historical_totals()
+        messagebox.showinfo("Éxito", "Registro eliminado correctamente")
 
     def update_category_options(self, event=None):
         tipo = self.tipo_var.get()
@@ -265,7 +430,8 @@ class FinancialManager:
                 self.monto_var.get(),
                 self.categoria_var.get(),
                 self.fecha_var.get(),
-                self.notas_var.get()
+                self.notas_var.get(),
+                uuid.uuid4().hex
             ])
 
         self.load_data()
@@ -331,6 +497,7 @@ class FinancialManager:
     def filter_data(self):
         month = self.month_var.get()
         year = self.year_var.get()
+        tipo = self.tipo_filter_var.get()
 
         # Limpiar tabla
         for item in self.table.get_children():
@@ -342,9 +509,13 @@ class FinancialManager:
                 reader = csv.reader(file)
                 next(reader)  # Skip header
                 for row in reader:
+                    if tipo == "Todos" and row[0] == "Todos":
+                        self.table.insert("", tk.END, values=row)
+                        continue
                     fecha = datetime.strptime(row[4], "%d/%m/%Y")
                     if (fecha.strftime("%m") == month and 
-                        fecha.strftime("%Y") == year):
+                        fecha.strftime("%Y") == year and 
+                        (tipo == "Todos" or row[0] == tipo)):
                         self.table.insert("", tk.END, values=row)
 
         self.update_summary()
