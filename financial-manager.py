@@ -110,14 +110,23 @@ class FinancialManager:
         self.main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # Create frames
-        self.create_input_frame()
+        self.create_input_summary_frame()
         self.create_filter_frame()
         self.create_table_frame()
-        self.create_summary_frame()
 
-    def create_input_frame(self):
-        input_frame = ttk.LabelFrame(self.main_container, text="Nueva Entrada", padding=10)
-        input_frame.pack(fill=tk.X, pady=(0, 10))
+    def create_input_summary_frame(self):
+        input_summary_frame = ttk.Frame(self.main_container)
+        input_summary_frame.pack(fill=tk.X, pady=(0, 10))
+
+        # Nueva Entrada
+        self.create_input_frame(input_summary_frame)
+
+        # Resumen
+        self.create_summary_frame(input_summary_frame)
+
+    def create_input_frame(self, parent):
+        input_frame = ttk.LabelFrame(parent, text="Nueva Entrada", padding=10)
+        input_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
 
         # Variables
         self.tipo_var = tk.StringVar()
@@ -129,6 +138,24 @@ class FinancialManager:
 
         # Grid layout for input fields
         self.create_input_fields(input_frame)
+
+    def create_summary_frame(self, parent):
+        summary_frame = ttk.LabelFrame(parent, text="Resumen", padding=10)
+        summary_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+
+        # Summary variables
+        self.summary_vars = {
+            "Ingresos": tk.StringVar(),
+            "Egresos": tk.StringVar(),
+            "Balance": tk.StringVar(),
+            "Activos": tk.StringVar(),
+            "Pasivos": tk.StringVar()
+        }
+
+        # Create summary labels
+        for i, (key, var) in enumerate(self.summary_vars.items()):
+            ttk.Label(summary_frame, text=f"{key}:").grid(row=0, column=i*2, padx=5, pady=5)
+            ttk.Label(summary_frame, textvariable=var).grid(row=0, column=i*2+1, padx=5, pady=5)
 
     def create_input_fields(self, frame):
         # Tipo
@@ -218,27 +245,9 @@ class FinancialManager:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.table.pack(fill=tk.BOTH, expand=True)
 
-    def create_summary_frame(self):
-        summary_frame = ttk.LabelFrame(self.main_container, text="Resumen", padding=10)
-        summary_frame.pack(fill=tk.X, pady=(10, 0))
-
-        # Summary variables
-        self.summary_vars = {
-            "Ingresos": tk.StringVar(),
-            "Egresos": tk.StringVar(),
-            "Balance": tk.StringVar(),
-            "Activos": tk.StringVar(),
-            "Pasivos": tk.StringVar()
-        }
-
-        # Create summary labels
-        for i, (key, var) in enumerate(self.summary_vars.items()):
-            ttk.Label(summary_frame, text=f"{key}:").grid(row=0, column=i*2, padx=5, pady=5)
-            ttk.Label(summary_frame, textvariable=var).grid(row=0, column=i*2+1, padx=5, pady=5)
-
     def update_category_options(self, event=None):
         tipo = self.tipo_var.get()
-        if tipo in self.categories:
+        if (tipo in self.categories):
             self.categoria_combo['values'] = self.categories[tipo]
             self.categoria_combo.set('')
 
