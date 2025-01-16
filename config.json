@@ -1,0 +1,25 @@
+{
+    "Ingreso": [
+        "Salario",
+        "Inversiones",
+        "Otros"
+    ],
+    "Egreso": [
+        "Alimentaci\u00f3n",
+        "Transporte",
+        "Servicios",
+        "Otros"
+    ],
+    "Activo": [
+        "Efectivo",
+        "Inversiones",
+        "Propiedades",
+        "Otros"
+    ],
+    "Pasivo": [
+        "Pr\u00e9stamos",
+        "Tarjetas",
+        "Hipoteca",
+        "Otros"
+    ]
+}
